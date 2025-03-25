@@ -11,6 +11,62 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
 
+        # Build up-to-date Nextflow
+        nextflowPackage = pkgs.stdenv.mkDerivation rec {
+          pname = "nextflow";
+          version = "25.02.1-edge";
+          src = pkgs.fetchFromGitHub {
+            owner = "nextflow-io";
+            repo = pname;
+            rev = "39f3c05e08b6aa4cc720c581704666af19871519";
+            sha256 = "sha256-1LnrAkpUJ9pgdrAgz3g0bJj1iJhkmJhbtSf9PEN4bDY=";
+          };
+
+          nativeBuildInputs = with pkgs; [ gradle makeWrapper ];
+
+          postPatch = ''
+            # Nextflow invokes the constant "/bin/bash" (not as a shebang) at
+            # several locations so we fix that globally. However, when running inside
+            # a container, we actually *want* "/bin/bash". Thus the global fix needs
+            # to be reverted for this specific use case.
+            substituteInPlace modules/nextflow/src/main/groovy/nextflow/executor/BashWrapperBuilder.groovy \
+              --replace-fail "['/bin/bash'," "['${pkgs.bash}/bin/bash'," \
+              --replace-fail "if( containerBuilder ) {" "if( containerBuilder ) {
+                        launcher = launcher.replaceFirst(\"/nix/store/.*/bin/bash\", \"/bin/bash\")"
+          '';
+
+          mitmCache = pkgs.gradle.fetchDeps {
+            inherit pname;
+            data = ./deps.json;
+          };
+          __darwinAllowLocalNetworking = true;
+
+          gradleUpdateTask = "pack";
+          # The installer attempts to copy a final JAR to $HOME/.nextflow/...
+          gradleFlags = [ "-Duser.home=\$TMPDIR" ];
+          preBuild = ''
+            # See Makefile (`make pack`)
+            export BUILD_PACK=1
+          '';
+          gradleBuildTask = "pack";
+        
+          installPhase = ''
+            runHook preInstall
+        
+            mkdir -p $out/bin
+            install -Dm755 build/releases/nextflow-${version}-dist $out/bin/nextflow
+        
+            runHook postInstall
+          '';
+        
+          postFixup = ''
+            wrapProgram $out/bin/nextflow \
+              --set JAVA_HOME ${pkgs.jdk} \
+              --prefix PATH : ${pkgs.jdk}/bin
+          '';
+
+        };
+
         # Build the Kotlin project
         kotlinProject = pkgs.stdenv.mkDerivation {
           name = "pytest2nf-test";
@@ -247,7 +303,7 @@
       in {
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
-            nextflow
+            nextflowPackage
             nf-test
             kotlinProject
             jdk
