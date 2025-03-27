@@ -14,12 +14,12 @@
         # Build up-to-date Nextflow
         nextflowPackage = pkgs.stdenv.mkDerivation rec {
           pname = "nextflow";
-          version = "25.02.1-edge";
+          version = "24.10.5";
           src = pkgs.fetchFromGitHub {
             owner = "nextflow-io";
             repo = pname;
-            rev = "39f3c05e08b6aa4cc720c581704666af19871519";
-            sha256 = "sha256-1LnrAkpUJ9pgdrAgz3g0bJj1iJhkmJhbtSf9PEN4bDY=";
+            rev = "b271f85df366749438ed3e32da3b091113a3d848";
+            hash = "sha256-sCIqeNh+Mdl9d7fywHkjAxWsZwv0VySZi/k5HEgee9w=";
           };
 
           nativeBuildInputs = with pkgs; [ gradle makeWrapper ];
